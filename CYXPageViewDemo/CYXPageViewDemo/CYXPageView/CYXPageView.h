@@ -20,6 +20,7 @@
 @property (nonatomic,strong) UILabel                    *titleLabel;//
 @property (nonatomic,strong) UIView *selectLine;//红线
 @property (nonatomic,assign) CGFloat topicHeight;//顶部高度默认44
+@property (nonatomic,assign) BOOL isTouchScroll;
 
 @property (nonatomic,strong) NSArray *titleList;
 
