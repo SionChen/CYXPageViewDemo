@@ -54,7 +54,9 @@
     self.pageCollectionView.frame = CGRectMake(0, self.topicCollectionView.bottom, self.width, self.height-self.topicCollectionView.height);
     [self.topicCollectionView reloadData];
     [self.pageCollectionView reloadData];
-    [self didSelectIndex:_selectIndex];
+    if (_selectIndex<[self.titleList count]) {
+        [self selectIndex:[NSIndexPath indexPathForRow:_selectIndex inSection:0] topicCollectionView:self.topicCollectionView withAnimation:NO];
+    }
 }
 
 #pragma mark Method
@@ -73,6 +75,57 @@
     _pageShadowView.selectIndex = _selectIndex;
     btn.selected?[_pageShadowView showItemListViewWithTop:[self convertRect:self.bounds toView:rootView].origin.y+self.topicHeight]:[_pageShadowView dissmissListView];
 }
+/**
+ 手动设置两个collectionview的偏移量
+ 
+ @param indexPath indexpath
+ @param collectionView topicCollectionView
+ @param animation 是否有动画
+ */
+-(void)selectIndex:(NSIndexPath *)indexPath topicCollectionView:(UICollectionView *)collectionView withAnimation:(BOOL)animation
+{
+    self.isTouchScroll = NO;
+    if (_selectIndex!=indexPath.row) {//这是点击topic
+        [self collectionView:self.topicCollectionView didDeselectItemAtIndexPath:[NSIndexPath indexPathForRow:_selectIndex inSection:0]];
+        _selectIndex = indexPath.row;
+        //[self.pageCollectionView scrollToItemAtIndexPath:indexPath atScrollPosition:UICollectionViewScrollPositionLeft animated:YES];
+    }
+    [self.pageCollectionView scrollToItemAtIndexPath:indexPath atScrollPosition:UICollectionViewScrollPositionLeft animated:animation];
+    //设置选中偏移量
+    CGFloat itemCenterX = [self getCenterXWithRow:indexPath.row];
+    CGFloat aimContentOffSetX = itemCenterX - collectionView.width/2-50;
+    aimContentOffSetX = (aimContentOffSetX<0?0:aimContentOffSetX);
+    if (collectionView.contentSize.width-collectionView.width>0) {
+        aimContentOffSetX = ((aimContentOffSetX>collectionView.contentSize.width-collectionView.width)?(collectionView.contentSize.width-collectionView.width):aimContentOffSetX);
+    }
+    if (animation) {
+        [UIView animateWithDuration:Show_Time animations:^{
+            [collectionView setContentOffset:CGPointMake(aimContentOffSetX, 0)];
+        }];
+    }else{
+        [collectionView setContentOffset:CGPointMake(aimContentOffSetX, 0)];
+    }
+    
+    //设置底部红线
+    CGSize size = [self collectionView:self.topicCollectionView layout:self.topicFlowLayout sizeForItemAtIndexPath:indexPath];
+    if (animation) {
+        [UIView animateWithDuration:Show_Time animations:^{
+            self.selectLine.size = CGSizeMake(size.width, 2);
+            self.selectLine.centerX = itemCenterX;
+        } completion:^(BOOL finished) {
+            CYXTopicCollectionViewCell *cell = (CYXTopicCollectionViewCell *)[collectionView cellForItemAtIndexPath:indexPath];
+            cell.selected = YES;
+        }];
+    }else{
+        self.selectLine.size = CGSizeMake(size.width, 2);
+        self.selectLine.centerX = itemCenterX;
+        CYXTopicCollectionViewCell *cell = (CYXTopicCollectionViewCell *)[collectionView cellForItemAtIndexPath:indexPath];
+        cell.selected = YES;
+    }
+    self.selectLine.bottom = self.topicCollectionView.height;
+    
+    [self.topicCollectionView reloadData];//刷新选择状态
+}
 #pragma mark CYXPageShadowViewDelegate
 -(void)didDismiss
 {
@@ -87,8 +140,10 @@
 }
 -(void)didSelectIndex:(NSInteger)index
 {
-    [self collectionView:self.topicCollectionView didDeselectItemAtIndexPath:[NSIndexPath indexPathForRow:_selectIndex inSection:0]];
-    [self collectionView:self.topicCollectionView didSelectItemAtIndexPath:[NSIndexPath indexPathForRow:index inSection:0]];
+    if (_selectIndex!=index) {
+        [self collectionView:self.topicCollectionView didDeselectItemAtIndexPath:[NSIndexPath indexPathForRow:_selectIndex inSection:0]];
+        [self collectionView:self.topicCollectionView didSelectItemAtIndexPath:[NSIndexPath indexPathForRow:index inSection:0]];
+    }
 }
 #pragma mark - UICollectionViewDataSource
 // 返回collection view里区(section)的个数
@@ -135,33 +190,7 @@
 // 当指定indexPath处的item被选择时触发
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
     if (collectionView == self.topicCollectionView) {
-        self.isTouchScroll = NO;
-        if (_selectIndex!=indexPath.row) {//这是点击topic
-            [self collectionView:self.topicCollectionView didDeselectItemAtIndexPath:[NSIndexPath indexPathForRow:_selectIndex inSection:0]];
-            _selectIndex = indexPath.row;
-            [self.pageCollectionView scrollToItemAtIndexPath:indexPath atScrollPosition:UICollectionViewScrollPositionLeft animated:YES];
-        }
-        
-        //设置选中偏移量
-        CGFloat itemCenterX = [self getCenterXWithRow:indexPath.row];
-        CGFloat aimContentOffSetX = itemCenterX - collectionView.width/2-50;
-        aimContentOffSetX = (aimContentOffSetX<0?0:aimContentOffSetX);
-        aimContentOffSetX = ((aimContentOffSetX>collectionView.contentSize.width-collectionView.width)?(collectionView.contentSize.width-collectionView.width):aimContentOffSetX);
-        [UIView animateWithDuration:Show_Time animations:^{
-            [collectionView setContentOffset:CGPointMake(aimContentOffSetX, 0)];
-        }];
-
-        //设置底部红线
-        NSString * keyWords = self.titleList[indexPath.row];
-        CGSize size = [keyWords sizeWithAttributes:@{NSFontAttributeName:[UIFont systemFontOfSize:12]}];
-        self.selectLine.size = CGSizeMake(size.width+5*2, 3);
-        self.selectLine.bottom = self.topicCollectionView.bottom;
-        [UIView animateWithDuration:Show_Time animations:^{
-            self.selectLine.centerX = itemCenterX;
-        } completion:^(BOOL finished) {
-            CYXTopicCollectionViewCell *cell = (CYXTopicCollectionViewCell *)[collectionView cellForItemAtIndexPath:indexPath];
-            cell.selected = YES;
-        }];
+        [self selectIndex:indexPath topicCollectionView:collectionView withAnimation:YES];
     }
     
 }
@@ -175,21 +204,10 @@
 }
 -(CGFloat)getCenterXWithRow:(NSInteger)row
 {
-    CGFloat itemWidth = self.topicFlowLayout.sectionInset.left;
-    for (int i =0; i<[self.titleList count]; i++) {
-        if (i<=row) {
-            NSString * keyWords = self.titleList[i];
-            CGSize size = [keyWords sizeWithAttributes:@{NSFontAttributeName:[UIFont systemFontOfSize:12]}];
-            if (i==row) {
-                itemWidth+= (size.width+10*2)/2;
-                break;
-            }
-            itemWidth += size.width+10*2;
-            itemWidth+=self.topicFlowLayout.minimumInteritemSpacing;
-        }
-        
-    }
-    return itemWidth;
+    if (row<0) {row=0;}
+    if (row>=[self.titleList count]) {row = [self.titleList count]-1;}
+    UICollectionViewLayoutAttributes * att = [self.topicCollectionView layoutAttributesForItemAtIndexPath:[NSIndexPath indexPathForRow:row inSection:0]];
+    return att.center.x;
 }
 #pragma mark UIScrollViewDelegate
 -(void)scrollViewDidEndDecelerating:(UIScrollView *)scrollView
@@ -200,10 +218,11 @@
         //设置选中偏移量
         CGFloat itemCenterX = [self getCenterXWithRow:_selectIndex];
         CGFloat aimContentOffSetX = itemCenterX - self.topicCollectionView.width/2-50;
-        aimContentOffSetX = (aimContentOffSetX<0?0:aimContentOffSetX);
         aimContentOffSetX = ((aimContentOffSetX>self.topicCollectionView.contentSize.width-self.topicCollectionView.width)?(self.topicCollectionView.contentSize.width-self.topicCollectionView.width):aimContentOffSetX);
+        aimContentOffSetX = (aimContentOffSetX<0?0:aimContentOffSetX);
         [UIView animateWithDuration:Show_Time animations:^{
             [self.topicCollectionView setContentOffset:CGPointMake(aimContentOffSetX, 0)];
+            //self.viewControler.title = bar.name;
         } completion:^(BOOL finished) {
             CYXTopicCollectionViewCell *cell = (CYXTopicCollectionViewCell *)[self.topicCollectionView cellForItemAtIndexPath:[NSIndexPath indexPathForRow:_selectIndex inSection:0]];
             cell.selected = YES;
@@ -217,22 +236,28 @@
 -(void)scrollViewDidScroll:(UIScrollView *)scrollView{
     if (scrollView == self.pageCollectionView&&self.isTouchScroll) {
         NSInteger index = (int)scrollView.contentOffset.x/scrollView.width;
+        if (index==[self.titleList count]-1) {
+            index--;
+        }
+        CYXTopicCollectionViewCell *indexcell = (CYXTopicCollectionViewCell *)[self.topicCollectionView cellForItemAtIndexPath:[NSIndexPath indexPathForRow:index inSection:0]];
         CGFloat indexCenterX = [self getCenterXWithRow:index];
+        //CGFloat indexCenterX = indexcell.centerX;
         NSInteger aimIndex = index+1;
+        CYXTopicCollectionViewCell *aimcell = (CYXTopicCollectionViewCell *)[self.topicCollectionView cellForItemAtIndexPath:[NSIndexPath indexPathForRow:aimIndex inSection:0]];
         CGFloat aimIndexCenterX = [self getCenterXWithRow:aimIndex];
+        //CGFloat aimIndexCenterX = aimcell.centerX;
         CGFloat scale = ABS(index*scrollView.width-scrollView.contentOffset.x)/scrollView.width;
         _selectLine.centerX = indexCenterX+(aimIndexCenterX - indexCenterX)*scale;//设置位移
         CGSize indexSize = [self collectionView:self.topicCollectionView layout:self.topicFlowLayout sizeForItemAtIndexPath:[NSIndexPath indexPathForRow:index inSection:0]];
         CGSize aimIndexSize = [self collectionView:self.topicCollectionView layout:self.topicFlowLayout sizeForItemAtIndexPath:[NSIndexPath indexPathForRow:aimIndex inSection:0]];
-        _selectLine.width = (indexSize.width-5*2)+(aimIndexSize.width-indexSize.width)*scale;//设置宽度
+        _selectLine.width = (indexSize.width)+(aimIndexSize.width-indexSize.width)*scale;//设置宽度
         if (scale>0.5) {
             [self collectionView:self.topicCollectionView didDeselectItemAtIndexPath:[NSIndexPath indexPathForRow:index inSection:0]];
-            CYXTopicCollectionViewCell *cell = (CYXTopicCollectionViewCell *)[self.topicCollectionView cellForItemAtIndexPath:[NSIndexPath indexPathForRow:aimIndex inSection:0]];
-            cell.selected = YES;
+            
+            aimcell.selected = YES;
         }else{
             [self collectionView:self.topicCollectionView didDeselectItemAtIndexPath:[NSIndexPath indexPathForRow:aimIndex inSection:0]];
-            CYXTopicCollectionViewCell *cell = (CYXTopicCollectionViewCell *)[self.topicCollectionView cellForItemAtIndexPath:[NSIndexPath indexPathForRow:index inSection:0]];
-            cell.selected = YES;
+            indexcell.selected = YES;
         }
         
         
